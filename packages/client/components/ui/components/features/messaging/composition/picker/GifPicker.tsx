@@ -29,16 +29,45 @@ type GifResult = {
   media_formats: Record<"webm" | "tinywebm", { url: string }>;
 };
 
+type GifboxConfig = {
+  enabled: boolean;
+  url: string;
+  attribution: string;
+};
+
 const FilterContext = createContext<(value: string) => void>();
+
+/**
+ * Shared signal for the gifbox configuration fetched directly from the API
+ * root, since the client SDK types do not yet include the gifbox feature.
+ */
+const [gifboxConfig, setGifboxConfig] = createSignal<GifboxConfig | null>(null);
+let gifboxConfigFetched = false;
+
+function ensureGifboxConfig(apiUrl: string | undefined) {
+  if (gifboxConfigFetched || !apiUrl) return;
+  gifboxConfigFetched = true;
+  fetch(`${apiUrl}/`)
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.features?.gifbox?.enabled) {
+        setGifboxConfig(data.features.gifbox);
+      }
+    })
+    .catch(() => {});
+}
 
 export function GifPicker() {
   const [filter, setFilter] = createSignal("");
   const client = useClient();
 
+  // Kick off gifbox config fetch from API root
+  ensureGifboxConfig(client()?.apiURL);
+
   const fliterLowercase = () => filter().toLowerCase();
 
   const placeholderText = () =>
-    ((client()?.configuration?.features as any)?.gifbox?.attribution) || "Search for GIFs...";
+    gifboxConfig()?.attribution || "Search for GIFs...";
 
   return (
     <Stack>
@@ -102,9 +131,10 @@ function Categories() {
 
   const trendingCategories = useQuery<GifCategory[]>(() => ({
     queryKey: ["trendingGifCategories"],
+    enabled: !!gifboxConfig(),
     queryFn: () => {
       const [authHeader, authHeaderValue] = client()!.authenticationHeader;
-      const gifboxUrl = (client()?.configuration?.features as any)?.gifbox?.url;
+      const gifboxUrl = gifboxConfig()!.url;
 
       return fetch(`${gifboxUrl}/categories?locale=en_US`, {
         headers: {
@@ -118,9 +148,10 @@ function Categories() {
 
   const trendingGif = useQuery<GifResult | null>(() => ({
     queryKey: ["trendingGif1"],
+    enabled: !!gifboxConfig(),
     queryFn: () => {
       const [authHeader, authHeaderValue] = client()!.authenticationHeader;
-      const gifboxUrl = (client()?.configuration?.features as any)?.gifbox?.url;
+      const gifboxUrl = gifboxConfig()!.url;
 
       return fetch(`${gifboxUrl}/trending?locale=en_US&limit=1`, {
         headers: {
@@ -222,9 +253,10 @@ function GifSearch(props: { query: string }) {
 
   const search = useQuery<GifResult[]>(() => ({
     queryKey: ["gifs", props.query],
+    enabled: !!gifboxConfig(),
     queryFn: () => {
       const [authHeader, authHeaderValue] = client()!.authenticationHeader;
-      const gifboxUrl = (client()?.configuration?.features as any)?.gifbox?.url;
+      const gifboxUrl = gifboxConfig()!.url;
 
       return fetch(
         gifboxUrl +
