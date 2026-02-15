@@ -33,15 +33,19 @@ const FilterContext = createContext<(value: string) => void>();
 
 export function GifPicker() {
   const [filter, setFilter] = createSignal("");
+  const client = useClient();
 
   const fliterLowercase = () => filter().toLowerCase();
+
+  const placeholderText = () =>
+    client()?.configuration?.features.gifbox.attribution || "Search for GIFs...";
 
   return (
     <Stack>
       <TextField
         autoFocus
         variant="filled"
-        placeholder="Search for GIFs..."
+        placeholder={placeholderText()}
         value={filter()}
         onMouseDown={(e) => {
           e.preventDefault();
