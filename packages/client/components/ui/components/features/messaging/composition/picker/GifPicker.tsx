@@ -108,6 +108,7 @@ function Categories() {
         },
       }).then((r) => r.json());
     },
+    enabled: !!client()?.configuration?.features?.gifbox?.url,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   }));
@@ -126,6 +127,7 @@ function Categories() {
         .then((r) => r.json())
         .then((resp) => resp.results[0]);
     },
+    enabled: !!client()?.configuration?.features?.gifbox?.url,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
     initialData: null,
@@ -223,8 +225,7 @@ function GifSearch(props: { query: string }) {
       const gifboxUrl = client()!.configuration!.features.gifbox.url;
 
       return fetch(
-        gifboxUrl +
-          "/" +
+        `${gifboxUrl}/` +
           (props.query === "trending"
             ? `trending?locale=en_US`
             : `search?locale=en_US&query=${encodeURIComponent(props.query)}`),
@@ -237,6 +238,7 @@ function GifSearch(props: { query: string }) {
         .then((r) => r.json())
         .then((resp) => resp.results);
     },
+    enabled: !!client()?.configuration?.features?.gifbox?.url,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   }));
