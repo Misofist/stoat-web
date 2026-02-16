@@ -29,19 +29,52 @@ type GifResult = {
   media_formats: Record<"webm" | "tinywebm", { url: string }>;
 };
 
+type GifboxConfig = {
+  enabled: boolean;
+  url: string;
+  attribution: string;
+};
+
 const FilterContext = createContext<(value: string) => void>();
+
+/**
+ * Shared signal for the gifbox configuration fetched directly from the API
+ * root, since the client SDK types do not yet include the gifbox feature.
+ */
+const [gifboxConfig, setGifboxConfig] = createSignal<GifboxConfig | null>(null);
+let gifboxConfigFetched = false;
+
+function ensureGifboxConfig(apiUrl: string | undefined) {
+  if (gifboxConfigFetched || !apiUrl) return;
+  gifboxConfigFetched = true;
+  fetch(`${apiUrl}/`)
+    .then((r) => r.json())
+    .then((data) => {
+      if (data?.features?.gifbox?.enabled) {
+        setGifboxConfig(data.features.gifbox);
+      }
+    })
+    .catch(() => {});
+}
 
 export function GifPicker() {
   const [filter, setFilter] = createSignal("");
+  const client = useClient();
+
+  // Kick off gifbox config fetch from API root
+  ensureGifboxConfig(import.meta.env.VITE_API_URL);
 
   const fliterLowercase = () => filter().toLowerCase();
+
+  const placeholderText = () =>
+    gifboxConfig()?.attribution || "Search for GIFs...";
 
   return (
     <Stack>
       <TextField
         autoFocus
         variant="filled"
-        placeholder="Search for GIFs..."
+        placeholder={placeholderText()}
         value={filter()}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -100,7 +133,7 @@ function Categories() {
     queryKey: ["trendingGifCategories"],
     queryFn: () => {
       const [authHeader, authHeaderValue] = client()!.authenticationHeader;
-      const gifboxUrl = client()!.configuration!.features.gifbox.url;
+      const gifboxUrl = gifboxConfig()!.url;
 
       return fetch(`${gifboxUrl}/categories?locale=en_US`, {
         headers: {
@@ -108,7 +141,7 @@ function Categories() {
         },
       }).then((r) => r.json());
     },
-    enabled: !!client()?.configuration?.features?.gifbox?.url,
+    enabled: !!gifboxConfig(),
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   }));
@@ -117,7 +150,7 @@ function Categories() {
     queryKey: ["trendingGif1"],
     queryFn: () => {
       const [authHeader, authHeaderValue] = client()!.authenticationHeader;
-      const gifboxUrl = client()!.configuration!.features.gifbox.url;
+      const gifboxUrl = gifboxConfig()!.url;
 
       return fetch(`${gifboxUrl}/trending?locale=en_US&limit=1`, {
         headers: {
@@ -127,7 +160,7 @@ function Categories() {
         .then((r) => r.json())
         .then((resp) => resp.results[0]);
     },
-    enabled: !!client()?.configuration?.features?.gifbox?.url,
+    enabled: !!gifboxConfig(),
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
     initialData: null,
@@ -222,10 +255,11 @@ function GifSearch(props: { query: string }) {
     queryKey: ["gifs", props.query],
     queryFn: () => {
       const [authHeader, authHeaderValue] = client()!.authenticationHeader;
-      const gifboxUrl = client()!.configuration!.features.gifbox.url;
+      const gifboxUrl = gifboxConfig()!.url;
 
       return fetch(
-        `${gifboxUrl}/` +
+        gifboxUrl +
+          "/" +
           (props.query === "trending"
             ? `trending?locale=en_US`
             : `search?locale=en_US&query=${encodeURIComponent(props.query)}`),
@@ -238,7 +272,7 @@ function GifSearch(props: { query: string }) {
         .then((r) => r.json())
         .then((resp) => resp.results);
     },
-    enabled: !!client()?.configuration?.features?.gifbox?.url,
+    enabled: !!gifboxConfig(),
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   }));
@@ -276,7 +310,7 @@ const GifItem = (props: {
       style={props.style as string}
       tabIndex={props.tabIndex}
       src={props.item.media_formats.tinywebm.url}
-      onClick={() => onMessage(props.item.url)}
+      onClick={() => onMessage(props.item.media_formats.gif.url)}
     />
   );
 };
